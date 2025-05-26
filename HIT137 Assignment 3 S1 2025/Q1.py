@@ -52,6 +52,13 @@ class ImageEditor:
         self.canvas.bind("<B1-Motion>", self.draw_crop)
         self.canvas.bind("<ButtonRelease-1>", self.end_crop)
 
+        # Bind keyboard shortcuts
+        self.root.bind("<Control-o>", lambda event: self.load_image())
+        self.root.bind("<Control-s>", lambda event: self.save_image())
+        self.root.bind("<Control-g>", lambda event: self.toggle_grayscale())
+        self.root.bind("<Control-z>", lambda event: self.undo())
+        self.root.bind("<Control-y>", lambda event: self.redo())
+
     def load_image(self):
         file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp")])
         if file_path:
@@ -65,6 +72,21 @@ class ImageEditor:
             self.scale_factor = 1.0
             self.size_slider.set(1.0)
             self.update_display()
+
+    def toggle_grayscale(self):
+        if self.cropped_image is None:
+            return
+        # Save state for undo
+        self.undo_stack.append({
+            'action': 'grayscale',
+            'image': self.cropped_image.copy(),
+            'scale_factor': self.scale_factor,
+            'brightness_factor': self.brightness_factor,
+            'is_grayscale': self.is_grayscale
+        })
+        self.redo_stack = []
+        self.is_grayscale = not self.is_grayscale
+        self.update_display()
     
     def save_image(self):
         if self.cropped_image is not None:
