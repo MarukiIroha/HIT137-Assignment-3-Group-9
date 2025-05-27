@@ -24,14 +24,13 @@ WHITE = (255, 255, 255)
 RED = (255, 0, 0)
 GREEN = (0, 128, 0)
 BLACK = (0, 0, 0)
-YELLOW = (255, 255, 0)
 BLUE = (0, 0, 255)
 FALLBACK_BG_COLOR = (100, 100)  # Gray, used if background images fail
 
 # Level-specific player Y positions
 PLAYER_Y_POSITIONS = {
-    1: 250,  # Level 1: higher on screen
-    2: 480,  # Level 2: ground level
+    1: 255,  # Level 1: higher on screen
+    2: 480, # Level 2: ground level
     3: 480   # Level 3: ground level
 }
 
@@ -91,11 +90,11 @@ class Player:
         self.health = 100
         self.max_health = 100
         self.hitbox = (self.x + 17, self.y + 11, 29, 52)
-        self.on_platform = False  # Track if player is on a platform
 
     def draw(self, win):
         if self.walkCount + 1 >= 27:
             self.walkCount = 0
+
         if not(self.standing):
             if self.left:
                 win.blit(walkLeft[self.walkCount//3], (self.x, self.y))
@@ -112,6 +111,7 @@ class Player:
         # Health bar
         pygame.draw.rect(win, RED, (self.x, self.y - 20, 50, 10))
         pygame.draw.rect(win, GREEN, (self.x, self.y - 20, 50 * (self.health / self.max_health), 10))
+        self.hitbox = (self.x + 17, self.y + 11, 29, 52)
 
     def hit(self, damage):
         self.health -= damage
@@ -119,9 +119,8 @@ class Player:
             global lives
             lives -= 1
             self.health = self.max_health
-            self.x = 200
-            self.y = PLAYER_Y_POSITIONS.get(level, 240)  # Reset to level's default Y
-            self.on_platform = False  # Reset platform status
+            self.x = 100
+            self.y = PLAYER_Y_POSITIONS.get(level, 240)  # Set y based on level, default 240
             if lives <= 0:
                 global game_over
                 game_over = True
@@ -194,6 +193,7 @@ class Enemy:
     def hit(self, damage):
         if self.health > 0:
             self.health -= damage
+            hitSound.play()  # Play hit sound
             if self.health <= 0:
                 self.visible = False
                 global score
@@ -255,27 +255,16 @@ class Boss(Enemy):
                 round(self.y + self.height // 2),
                 6, (128, 0, 128), facing, damage=15
             ))
-            print(f"Boss shot projectile: x={self.x + self.width // 2}, facing={facing}")
 
     def hit(self, damage):
         if self.health > 0:
             self.health -= damage
+            hitSound.play()
             if self.health <= 0:
                 self.visible = False
                 global score
                 score += 50
 
-class Platform:
-    def __init__(self, x, y, width, height):
-        self.x = x
-        self.y = y
-        self.width = width
-        self.height = height
-        self.hitbox = (self.x, self.y, self.width, self.height)
-
-    def draw(self, win):
-        pass
-    
 class Collectible:
     # Load animation frames for each collectible type
     sprites = {
@@ -384,21 +373,16 @@ def setup_level(level):
     collectibles = []
     boss = None
     goal = None
-    platforms = []
     if level == 1:
         enemies = [
-            Enemy(300, 250, 64, 64, 450),
-            Enemy(500, 250, 64, 64, 600)
+            Enemy(300, 255, 64, 64, 450),
+            Enemy(500, 255, 64, 64, 600)
         ]
         collectibles = [
             Collectible(400, 120, 20, 20, 'heart'),
             Collectible(600, 120, 20, 20, 'coin')
         ]
-        goal = Goal(700, 250, 50, 50)
-        platforms = [
-            Platform(372, 170, 65, 20),  # Smaller platform
-            Platform(560, 170, 95, 20)   # Larger platform
-        ]
+        goal = Goal(700, 255, 50, 50)  # Goal at right side of screen
     elif level == 2:
         enemies = [
             Enemy(200, 480, 64, 64, 400),
@@ -409,14 +393,15 @@ def setup_level(level):
             Collectible(350, 400, 20, 20, 'potion'),
             Collectible(500, 400, 20, 20, 'coin')
         ]
-        goal = Goal(750, 480, 50, 50)
+        goal = Goal(750, 480, 50, 50)  # Goal further right
     elif level == 3:
         boss = Boss(500, 480, 80, 80, 700)
         collectibles = [
             Collectible(300, 400, 20, 20, 'heart'),
             Collectible(450, 400, 20, 20, 'potion')
         ]
-    return enemies, collectibles, boss, goal, platforms
+        # No goal for level 3; win by defeating boss
+    return enemies, collectibles, boss, goal
 
 def draw_game_over(win):
     win.fill(BLACK)
@@ -434,12 +419,9 @@ def redraw_game_window():
     if backgrounds and len(backgrounds) >= level:
         win.blit(backgrounds[level - 1], (0, 0))
     else:
-        win.fill(FALLBACK_BG_COLOR)
+        win.fill(FALLBACK_BG_COLOR)  # Fallback to solid color if background image is missing
     text = font.render(f'Score: {score}  Lives: {lives}  Level: {level}', 1, (0, 0, 0))
     win.blit(text, (10, 10))
-    # Draw platforms
-    for platform in platforms:
-        platform.draw(win)
     man.draw(win)
     for enemy in enemies:
         enemy.draw(win)
@@ -456,14 +438,12 @@ def redraw_game_window():
     pygame.display.update()
 
 async def main():
-    global man, enemies, collectibles, boss, bullets, boss_bullets, score, level, lives, game_over, goal, platforms
-    man = Player(200, PLAYER_Y_POSITIONS[1], 64, 64)
-    enemies, collectibles, boss, goal, platforms = setup_level(level)
+    global man, enemies, collectibles, boss, bullets, boss_bullets, score, level, lives, game_over, goal
+    man = Player(200, PLAYER_Y_POSITIONS[1], 64, 64)  # y = 240 for level 1
+    enemies, collectibles, boss, goal = setup_level(level)
     bullets = []
     boss_bullets = []
     shoot_loop = 0
-    gravity = 0.5  # Gravity for falling
-    fall_velocity = 0
 
     while True:
         if game_over:
@@ -474,8 +454,8 @@ async def main():
                 level = 1
                 lives = 3
                 game_over = False
-                man = Player(200, PLAYER_Y_POSITIONS[1], 64, 64)
-                enemies, collectibles, boss, goal, platforms = setup_level(level)
+                man = Player(200, PLAYER_Y_POSITIONS[1], 64, 64)  # y = 240 for level 1 restart
+                enemies, collectibles, boss, goal = setup_level(level)
                 bullets = []
                 boss_bullets = []
             for event in pygame.event.get():
@@ -509,46 +489,14 @@ async def main():
             man.standing = False
         else:
             man.standing = True
-            man.walkCount = 0
+            man.walk_count = 0
 
-        # Platform collision detection
-        man.on_platform = False
-        for platform in platforms:
-            if (man.hitbox[0] + man.hitbox[2] > platform.hitbox[0] and
-                man.hitbox[0] < platform.hitbox[0] + platform.hitbox[2] and
-                man.hitbox[1] + man.hitbox[3] > platform.hitbox[1] and
-                man.hitbox[1] + man.hitbox[3] <= platform.hitbox[1] + platform.hitbox[3] + 2 and
-                fall_velocity >= 0):  # Only land when falling or stationary
-                man.y = platform.hitbox[1] - man.height - 11  # Stand on platform
-                man.is_jump = False
-                man.jump_count = 10
-                man.on_platform = True
-                fall_velocity = 0
-                break
-
-        # Apply gravity only if not on platform and not jumping
-        if not man.is_jump and not man.on_platform:
-            default_y = PLAYER_Y_POSITIONS.get(level, 240)
-            if man.y < default_y:
-                fall_velocity += gravity
-                man.y += fall_velocity
-                if man.y > default_y:
-                    man.y = default_y
-                    fall_velocity = 0
-            else:
-                man.y = default_y
-                fall_velocity = 0
-        elif man.on_platform:
-            fall_velocity = 0  # Reset velocity when on platform to prevent bouncing
-
-        # Jumping logic
         if not man.is_jump:
             if keys[pygame.K_UP]:
                 man.is_jump = True
                 man.right = False
                 man.left = False
-                man.walkCount = 0
-                fall_velocity = 0
+                man.walk_count = 0
         else:
             if man.jump_count >= -10:
                 neg = 1 if man.jump_count >= 0 else -1
@@ -557,12 +505,13 @@ async def main():
             else:
                 man.is_jump = False
                 man.jump_count = 10
-                fall_velocity = 0  # Ensure no residual velocity after jump
 
         if keys[pygame.K_SPACE] and shoot_loop == 0:
             facing = -1 if man.left else 1
             if len(bullets) < 5:
                 bullets.append(Projectile(round(man.x + man.width // 2), round(man.y + man.height // 2), 6, (0, 0, 0), facing))
+                if bulletSound:  # Check if sound is loaded
+                    bulletSound.play()  # Play shooting sound
             shoot_loop = 1
 
         # Collision detection: Enemies and player
@@ -623,10 +572,9 @@ async def main():
                 if man.hitbox[0] + man.hitbox[2] > goal.hitbox[0] and man.hitbox[0] < goal.hitbox[0] + goal.hitbox[2]:
                     if level < max_levels:
                         level += 1
-                        enemies, collectibles, boss, goal, platforms = setup_level(level)
+                        enemies, collectibles, boss, goal = setup_level(level)
                         man.x = 200
-                        man.y = PLAYER_Y_POSITIONS.get(level, 480)
-                        man.on_platform = False
+                        man.y = PLAYER_Y_POSITIONS.get(level, 480)  # y = 480 for level 2 or 3
                         bullets = []
                         boss_bullets = []
 
