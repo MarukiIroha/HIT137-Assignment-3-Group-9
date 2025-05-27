@@ -29,9 +29,9 @@ FALLBACK_BG_COLOR = (100, 100)  # Gray, used if background images fail
 
 # Level-specific player Y positions
 PLAYER_Y_POSITIONS = {
-    1: 255,  # Level 1: higher on screen
-    2: 480, # Level 2: ground level
-    3: 480   # Level 3: ground level
+    1: 255,  # Level 1
+    2: 480, # Level 2
+    3: 480   # Level 3
 }
 
 # Load images with paths relative to the script's directory
@@ -218,7 +218,7 @@ class Boss(Enemy):
         self.vel = 2
         self.damage = 20
         self.shoot_timer = 0
-        self.shoot_interval = 60  # Shoot every ~1 second at 60 FPS
+        self.shoot_interval = 30  # Shoot every ~0.5 second at 60 FPS
         self.walkCount = 0
 
     def draw(self, win):
